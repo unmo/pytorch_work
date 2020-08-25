@@ -11,6 +11,8 @@ scipy = "*"
 sklearn = "*"
 torch = {file = "https://download.pytorch.org/whl/cu102/torch-1.6.0-cp38-cp38-win_amd64.whl"}
 torchvision = {file = "https://download.pytorch.org/whl/cu102/torchvision-0.7.0-cp38-cp38-win_amd64.whl"}
+pandas = "*"
+matplotlib = "*"
 
 [requires]
 python_version = "3.8"
