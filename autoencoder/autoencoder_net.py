@@ -1,1 +1,0 @@
-# Defined Autoencoder Network Model
