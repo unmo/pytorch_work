@@ -1,6 +1,7 @@
 # -*-coding: utf-8 -*-
 
 import torch
+from torch.utils.data import DataLoader
 
 # ネットワーク定義を動的に行うのはネットワークモデルの評価時のみにしか使わない
 # ネットワーク構造が確定したら、内部構造をコーディングすればよい
@@ -49,13 +50,14 @@ class Decoder(torch.nn.Module):
         self.conbinate_relations = conbinate_relations[::-1]
 
         for layer, dims in enumerate(self.conbinate_relations):
-            # self.constructions[f"{layer}"] = torch.nn.Linear(dims[1], dims[0])
             exec(f"self.fc{layer} = torch.nn.Linear({dims[1]}, {dims[0]})")
+            # self.constructions[f"{layer}"] = torch.nn.Linear(dims[1], dims[0])
 
     def forward(self, x):
         for layer in range(1, len(self.conbinate_relations)):
-            # x = self.constructions[f"{layer}"](x)
             x = eval(f"torch.relu(self.fc{layer}(x))")
+            # x = self.constructions[f"{layer}"](x)
+
         return x
 
 
@@ -66,8 +68,8 @@ class StackedAutoEncoder(torch.nn.Module):
         self.dec = Decoder(self.enc.conbinate_relations)
 
     def __call__(self, x):
-        self.middle = self.enc(x)
-        x = self.dec(self.middle)
+        self.middle = self.enc.forward(x)
+        x = self.dec.forward(self.middle)
         return x
 
 
@@ -85,14 +87,12 @@ class MyAutoEncoder:
         for epoch in range(1, epochs + 1):
             running_loss = 0.0
             for x in train_data:
-                print(type(x))
                 out = self.stacked_ae(x)
                 loss = lossfunc(out, x)
                 optimaizer.zero_grad()
                 loss.backward()
                 optimaizer.step()
                 print(loss)
-                # losses.append(loss.data[0])
 
             # print(f"epoch [{epoch}/{epochs}, loss: {loss.data[0]}]")
 
@@ -101,19 +101,20 @@ if __name__ == "__main__":
 
     # モデル定義
     # ファクトリパターンでクラス化するとよい
-    dim = 16
+    dim = 256
     layer = 5
     # autoencder = StackedAutoEncoder(dim, layer)
 
     my_ae = MyAutoEncoder(dim, layer)
+    print(my_ae.stacked_ae.enc)
+    print(my_ae.stacked_ae.dec)
     # train条件
     # trainの条件はファクトリパターンでクラス化する
-    epochs = 10
+    epochs = 1000
     lossfunc = torch.nn.MSELoss()
-    optimaizer = torch.optim.Adam(my_ae.stacked_ae.parameters(), lr=0.01)
+    optimaizer = torch.optim.Adam(my_ae.stacked_ae.parameters(), lr=0.0001)
 
     # 自前データセットを生成する場合は、transformでtensor型に変換する
     # 自前データセットを生成する場合は、torch.utils.data.Datasetで定義する
-    # train_data = [torch.rand(100, dim) for i in range(100)]
-    train_data = [torch.empty(1, dim) for i in range(100)]
+    train_data = DataLoader([torch.rand(dim) for i in range(100)], 100, True)
     my_ae.train(train_data, epochs, lossfunc, optimaizer)
