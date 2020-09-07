@@ -15,24 +15,25 @@ class Encoder(torch.nn.Module):
         self.conbinate_relations = self.__get_conbinate_relation()
 
         for layer, dims in enumerate(self.conbinate_relations, 1):
-            self.constructions[f"{layer}"] = torch.nn.Linear(dims[0], dims[1])
-            # exec(f"self.fc{layer} = torch.nn.Linear({dims[0]}, {dims[1]})")
+            # self.constructions[f"{layer}"] = torch.nn.Linear(dims[0], dims[1])
+            exec(f"self.fc{layer} = torch.nn.Linear({dims[0]}, {dims[1]})")
 
     def __get_conbinate_relation(self):
         prev_dim = self.init_dim
         relations = []
         for layer in range(1, self.layer_num + 1):
             if prev_dim == 1:
-                prev_dim *= 2
-            relations.append((prev_dim, prev_dim // 2))
-            prev_dim //= 2
+                relations.append((prev_dim, prev_dim))
+            else:
+                relations.append((prev_dim, prev_dim // 2))
+                prev_dim //= 2
 
         return relations
 
     def forward(self, x):
         for layer in range(1, len(self.conbinate_relations)):
-            x = self.constructions[f"{layer}"](x)
-            # x = eval(f"torch.relu(self.fc{layer}(x))")
+            # x = self.constructions[f"{layer}"](x)
+            x = eval(f"torch.relu(self.fc{layer}(x))")
         return x
 
 
@@ -48,11 +49,12 @@ class Decoder(torch.nn.Module):
         self.conbinate_relations = conbinate_relations[::-1]
 
         for layer, dims in enumerate(self.conbinate_relations):
-            # self.constructions[f"{layer}"] = torch.nn.Linear(dims[0], dims[1])
+            # self.constructions[f"{layer}"] = torch.nn.Linear(dims[1], dims[0])
             exec(f"self.fc{layer} = torch.nn.Linear({dims[1]}, {dims[0]})")
 
     def forward(self, x):
         for layer in range(1, len(self.conbinate_relations)):
+            # x = self.constructions[f"{layer}"](x)
             x = eval(f"torch.relu(self.fc{layer}(x))")
         return x
 
@@ -63,42 +65,55 @@ class StackedAutoEncoder(torch.nn.Module):
         self.enc = Encoder(dim, layer_num)
         self.dec = Decoder(self.enc.conbinate_relations)
 
-    def forward(self, x):
+    def __call__(self, x):
         self.middle = self.enc(x)
         x = self.dec(self.middle)
         return x
 
 
 class MyAutoEncoder:
-    def __init__(self, dim, layer, lossfunc, optimaizer):
+    def __init__(self, dim, layer):
         self.dim = dim
         self.layer = layer
-        self.optimaizer = optimaizer
         self.stacked_ae = StackedAutoEncoder(dim, layer)
+        print(self.stacked_ae.parameters())
 
-    def train(self, train_data, epochs):
+    def train(self, train_data, epochs, lossfun, optimizer):
         losses = []
         output_and_label = []
 
         for epoch in range(1, epochs + 1):
-            pass
+            running_loss = 0.0
+            for x in train_data:
+                print(type(x))
+                out = self.stacked_ae(x)
+                loss = lossfunc(out, x)
+                optimaizer.zero_grad()
+                loss.backward()
+                optimaizer.step()
+                print(loss)
+                # losses.append(loss.data[0])
+
+            # print(f"epoch [{epoch}/{epochs}, loss: {loss.data[0]}]")
 
 
 if __name__ == "__main__":
-    # e = Encoder(256, 5)
-    # print(e.conbinate_relations)
-    # out = e.forward(torch.rand(2, 256))
-    # d = Decoder(e.conbinate_relations)
-    # out = d.forward(out)
-    # print(out.shape)
-    dim = 256
+
+    # モデル定義
+    # ファクトリパターンでクラス化するとよい
+    dim = 16
     layer = 5
-    autoencder = StackedAutoEncoder(dim, layer)
-    out = autoencder.forward(torch.rand(10, dim))
-    print(out.shape)
-    print(autoencder.state_dict())
+    # autoencder = StackedAutoEncoder(dim, layer)
 
+    my_ae = MyAutoEncoder(dim, layer)
+    # train条件
+    # trainの条件はファクトリパターンでクラス化する
+    epochs = 10
     lossfunc = torch.nn.MSELoss()
-    optimaizer = torch.optim.SGD(autoencder.parameters(), lr=0.1)
+    optimaizer = torch.optim.Adam(my_ae.stacked_ae.parameters(), lr=0.01)
 
-    my_ae = MyAutoEncoder(dim, layer, lossfunc, optimaizer)
+    # 自前データセットを生成する場合は、transformでtensor型に変換する
+    # 自前データセットを生成する場合は、torch.utils.data.Datasetで定義する
+    # train_data = [torch.rand(100, dim) for i in range(100)]
+    train_data = [torch.empty(1, dim) for i in range(100)]
+    my_ae.train(train_data, epochs, lossfunc, optimaizer)
