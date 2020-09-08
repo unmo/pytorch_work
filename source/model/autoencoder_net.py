@@ -94,8 +94,6 @@ class MyAutoEncoder:
                 optimaizer.step()
                 print(loss)
 
-            # print(f"epoch [{epoch}/{epochs}, loss: {loss.data[0]}]")
-
 
 if __name__ == "__main__":
 
